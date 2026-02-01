@@ -11,18 +11,30 @@ import HoldPiece from './HoldPiece';
 import NextPiece from './NextPiece';
 
 const Tetris: React.FC = () => {
+  const [gameMode, setGameMode] = React.useState<'single' | 'multi' | null>(null);
   const { gameState, actions } = useTetrisGame();
   const { stage, score, rows, level, gameOver, hold, nextPiece, waiting } = gameState;
   
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    actions.startGame();
-    wrapperRef.current?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (gameMode && !waiting) {
+        wrapperRef.current?.focus();
+    }
+  }, [gameMode, waiting]);
+
+  const handleStartSingle = () => {
+      setGameMode('single');
+      actions.startGame();
+  };
+
+  const handleStartMulti = () => {
+      setGameMode('multi');
+      actions.startMultiplayer();
+  };
 
   const keyUp = ({ keyCode }: { keyCode: number }) => {
+    if (!gameMode) return;
     if (!gameOver && !waiting) {
       if (keyCode === 40) {
         actions.setDropTime(1000 / (level + 1) + 200);
@@ -57,6 +69,22 @@ const Tetris: React.FC = () => {
     }
   };
 
+  if (!gameMode) {
+      return (
+          <div className="tetris-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <h1 style={{ marginBottom: '40px', fontFamily: 'Pixelify Sans', fontSize: '3rem' }}>Tetris Game</h1>
+              <div style={{ display: 'flex', gap: '20px' }}>
+                  <button className="start-button" style={{ width: '200px' }} onClick={handleStartSingle}>
+                      Single Play
+                  </button>
+                  <button className="start-button" style={{ width: '200px' }} onClick={handleStartMulti}>
+                      Multi Play
+                  </button>
+              </div>
+          </div>
+      );
+  }
+
   return (
     <div className='tetris-wrapper' role="button" tabIndex={0} onKeyDown={move} onKeyUp={keyUp} ref={wrapperRef}>
       <div className='tetris' style={{ position: 'relative' }}>
@@ -84,7 +112,7 @@ const Tetris: React.FC = () => {
               <HoldPiece hold={hold} />
             </div>
           )}
-          <StartButton callback={actions.startGame} />
+          <button className="start-button" onClick={() => { setGameMode(null); /* Reset game? */ }}>Back to Menu</button>
         </aside>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { GameState } from './TetrisGame';
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || (import.meta.env.PROD ? '/' : 'http://localhost:3001');
 
 export class SocketManager {
-  private socket: Socket;
+  private socket: Socket | null = null;
   private onStartCallback: ((room: string) => void) | null = null;
   private onOpponentStateCallback: ((state: any) => void) | null = null;
   private onGameOverWinCallback: (() => void) | null = null;
@@ -13,13 +13,20 @@ export class SocketManager {
   private onWaitingCallback: (() => void) | null = null;
 
   constructor() {
-    this.socket = io(SERVER_URL);
-    this.setupListeners();
+    // Lazy connection
+  }
+
+  public connect() {
+      if (this.socket) return;
+      this.socket = io(SERVER_URL);
+      this.setupListeners();
   }
 
   private setupListeners() {
+    if (!this.socket) return;
+    
     this.socket.on('connect', () => {
-      console.log('Connected to server with ID:', this.socket.id);
+      console.log('Connected to server with ID:', this.socket?.id);
     });
 
     this.socket.on('waiting_for_opponent', () => {
@@ -46,6 +53,7 @@ export class SocketManager {
   }
 
   public emitState(state: GameState) {
+    if (!this.socket) return;
     // Broadcast key game state info
     this.socket.emit('update_state', {
       stage: state.stage, 
@@ -56,6 +64,7 @@ export class SocketManager {
   }
 
   public emitWin() {
+    if (!this.socket) return;
     this.socket.emit('player_won');
   }
 
@@ -80,6 +89,9 @@ export class SocketManager {
   }
 
   public disconnect() {
-    this.socket.disconnect();
+    if (this.socket) {
+        this.socket.disconnect();
+        this.socket = null;
+    }
   }
 }

@@ -99,6 +99,13 @@ export class TetrisGame {
     this.setupSocket();
   }
 
+  public startMultiplayer() {
+      this.socketManager.connect();
+      // The socket event 'start_game' will trigger actual game start
+      // But we might want to reset state to 'waiting' visually?
+      // TetrisGame's waiting state is set via callback from socketManager.onWaiting
+  }
+
   private setupSocket() {
     this.socketManager.onWaiting(() => {
         this.waiting = true;

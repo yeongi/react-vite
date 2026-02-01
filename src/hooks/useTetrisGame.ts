@@ -43,6 +43,11 @@ export const useTetrisGame = () => {
       syncState();
   }, [syncState]);
 
+  const startMultiplayer = useCallback(() => {
+      game.current.startMultiplayer();
+      syncState(); // To reflect waiting state potentially
+  }, [syncState]);
+
   const setDropTime = useCallback((time: number | null) => {
       game.current.setDropTime(time);
       syncState();
@@ -62,6 +67,7 @@ export const useTetrisGame = () => {
           rotate,
           holdPiece,
           startGame,
+          startMultiplayer,
           setDropTime
       }
   };

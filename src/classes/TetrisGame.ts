@@ -33,6 +33,7 @@ export interface GameState {
   dropTime: number | null;
   nextPiece: TETROMINO_TYPE | 0;
   hold: TETROMINO_TYPE | null;
+  won: boolean;
 }
 
 export class TetrisGame {
@@ -47,9 +48,11 @@ export class TetrisGame {
   
   // Game Status
   private score: number;
-  private rows: number;
+  private rows: number; // This tracks rows for level, but we can use it for total too or add totalRows
+  private totalRows: number;
   private level: number;
   private gameOver: boolean;
+  private won: boolean;
   private dropTime: number | null;
 
   constructor() {
@@ -61,8 +64,10 @@ export class TetrisGame {
     this.floorSpinCount = 0;
     this.score = 0;
     this.rows = 0;
+    this.totalRows = 0;
     this.level = 0;
     this.gameOver = false;
+    this.won = false;
     this.dropTime = null;
     this.soundManager = new SoundManager();
 
@@ -103,8 +108,10 @@ export class TetrisGame {
     this.holdUsed = false;
     this.score = 0;
     this.rows = 0;
+    this.totalRows = 0;
     this.level = 0;
     this.gameOver = false;
+    this.won = false;
     this.dropTime = 1000;
     this.floorSpinCount = 0;
 
@@ -233,6 +240,12 @@ export class TetrisGame {
       this.dropTime = time;
   }
 
+  public setGameOver(won: boolean) {
+      this.gameOver = true;
+      this.won = won;
+      this.dropTime = null;
+  }
+
   // --- Internal Logic ---
 
   private spawnPiece() {
@@ -296,7 +309,15 @@ export class TetrisGame {
         const points = linePoints[rowsCleared - 1] || 0; // Safeguard
         this.score += points * (this.level + 1);
         this.rows += rowsCleared;
+        this.totalRows += rowsCleared;
         this.level += rowsCleared;
+
+        if (this.totalRows >= 20) {
+            this.won = true;
+            this.gameOver = true;
+            this.dropTime = null;
+            // Optionally play win sound
+        }
       }
 
       // 4. Spawn Next
@@ -359,7 +380,8 @@ export class TetrisGame {
         gameOver: this.gameOver,
         dropTime: this.dropTime,
         nextPiece: this.nextPiece,
-        hold: this.hold
+        hold: this.hold,
+        won: this.won
     };
   }
 }

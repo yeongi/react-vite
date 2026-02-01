@@ -10,7 +10,7 @@ const NextPiece: React.FC<Props> = ({ nextPiece }) => {
   const tetromino = nextPiece && nextPiece !== 0 ? TETROMINOS[nextPiece as keyof typeof TETROMINOS].shape : [[0]];
 
   return (
-    <div className='display' style={{ flexDirection: 'column', alignItems: 'center' }}>
+    <div className='display' style={{ flexDirection: 'column', alignItems: 'center', width: '120px', height: '120px', justifyContent: 'center' }}>
       <div style={{ marginBottom: '10px' }}>Next</div>
       <div style={{
         display: 'grid',

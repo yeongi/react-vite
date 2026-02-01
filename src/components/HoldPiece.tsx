@@ -10,7 +10,7 @@ const HoldPiece: React.FC<Props> = ({ hold }) => {
   const tetromino = hold ? TETROMINOS[hold as keyof typeof TETROMINOS].shape : [[0]];
 
   return (
-    <div className='display' style={{ flexDirection: 'column', alignItems: 'center' }}>
+    <div className='display' style={{ flexDirection: 'column', alignItems: 'center', width: '100%', height: '120px', justifyContent: 'center' }}>
       <div style={{ marginBottom: '10px' }}>Hold</div>
       <div style={{
         display: 'grid',

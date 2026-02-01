@@ -1,5 +1,6 @@
 import { STAGE, IPlayer, TETROMINO_TYPE, TETROMINOS, STAGE_WIDTH, createStage, checkCollision, generateBag } from '../gameHelpers';
 import { SoundManager } from './SoundManager';
+import { SocketManager } from './SocketManager';
 
 // SRS Wall Kick Data
 const SRS_KICKS_JLS_T_Z = {
@@ -34,6 +35,14 @@ export interface GameState {
   nextPiece: TETROMINO_TYPE | 0;
   hold: TETROMINO_TYPE | null;
   won: boolean;
+  opponent: {
+    stage: STAGE | null;
+    score: number;
+    rows: number;
+    gameOver: boolean;
+  } | null;
+  waiting: boolean;
+  room: string | null;
 }
 
 export class TetrisGame {
@@ -45,15 +54,21 @@ export class TetrisGame {
   private holdUsed: boolean;
   private floorSpinCount: number;
   private soundManager: SoundManager;
+  private socketManager: SocketManager;
   
   // Game Status
   private score: number;
-  private rows: number; // This tracks rows for level, but we can use it for total too or add totalRows
+  private rows: number;
   private totalRows: number;
   private level: number;
   private gameOver: boolean;
   private won: boolean;
   private dropTime: number | null;
+
+  // Multiplayer Status
+  private opponentState: any | null = null;
+  private waiting: boolean = false;
+  private room: string | null = null;
 
   constructor() {
     // Initial State
@@ -70,6 +85,7 @@ export class TetrisGame {
     this.won = false;
     this.dropTime = null;
     this.soundManager = new SoundManager();
+    this.socketManager = new SocketManager();
 
     // Initialize Bag and Player
     this.nextPiece = this.popFromBag(); // Provisional
@@ -79,6 +95,39 @@ export class TetrisGame {
       collided: false,
       rotation: 0
     };
+
+    this.setupSocket();
+  }
+
+  private setupSocket() {
+    this.socketManager.onWaiting(() => {
+        this.waiting = true;
+    });
+
+    this.socketManager.onStart((room) => {
+        this.waiting = false;
+        this.room = room;
+        // Start game when server says so
+        this.start(true); 
+    });
+
+    this.socketManager.onOpponentState((state) => {
+        this.opponentState = state;
+    });
+
+    this.socketManager.onGameOverWin(() => {
+        this.gameOver = true;
+        this.won = true;
+        this.dropTime = null;
+        // Play win sound?
+    });
+
+    this.socketManager.onGameOverLose(() => {
+        this.gameOver = true;
+        this.won = false;
+        this.dropTime = null;
+        this.soundManager.playGameOver();
+    });
   }
 
   // --- Helper Methods ---
@@ -100,7 +149,8 @@ export class TetrisGame {
 
   // --- Core Game Logic ---
 
-  public start() {
+  public start(fromSocket: boolean = false) {
+    // Only reset if it's a real start (from socket) or initial local setup
     this.soundManager.resume();
     this.stage = createStage();
     this.bag = [];
@@ -114,6 +164,7 @@ export class TetrisGame {
     this.won = false;
     this.dropTime = 1000;
     this.floorSpinCount = 0;
+    this.opponentState = null;
 
     // Initialize pieces
     const current = this.popFromBag();
@@ -125,6 +176,10 @@ export class TetrisGame {
       collided: false,
       rotation: 0,
     };
+
+    if (fromSocket) {
+        this.socketManager.emitState(this.getState());
+    }
   }
 
   public move(dir: number) {
@@ -132,6 +187,7 @@ export class TetrisGame {
     if (this.gameOver) return;
     if (!checkCollision(this.player, this.stage, { x: dir, y: 0 })) {
       this.player.pos.x += dir;
+      this.socketManager.emitState(this.getState());
     }
   }
 
@@ -147,16 +203,25 @@ export class TetrisGame {
     if (!checkCollision(this.player, this.stage, { x: 0, y: 1 })) {
       this.player.pos.y += 1;
       this.floorSpinCount = 0; // Reset floor spin count on drop
+      this.socketManager.emitState(this.getState());
     } else {
       // Game Over check
       if (this.player.pos.y < 1) {
         this.gameOver = true;
         this.dropTime = null;
         this.soundManager.playGameOver();
+        this.socketManager.emitState(this.getState());
+        // For now, local lose. Server logic will handle 'player_won' from other side.
+        // But if *I* lose, I should probably tell server?
+        // Server only listens to 'player_won'.
+        // So we wait for server to tell us we lost? No, we know we lost.
+        // We tell server "I lost" -> server tells other "You won".
+        // But server currently doesn't support 'player_lost'.
+      } else {
+        // Lock piece
+        this.player.collided = true;
+        this.updateStage();
       }
-      // Lock piece
-      this.player.collided = true;
-      this.updateStage();
     }
   }
 
@@ -170,6 +235,7 @@ export class TetrisGame {
     this.player.pos.y += tmpY;
     this.player.collided = true;
     this.updateStage();
+    this.socketManager.emitState(this.getState());
   }
 
   public rotate(dir: number) {
@@ -207,6 +273,7 @@ export class TetrisGame {
           clonedPlayer.pos.x += kx;
           clonedPlayer.pos.y -= ky;
           this.player = clonedPlayer;
+          this.socketManager.emitState(this.getState());
           return;
         }
       }
@@ -234,6 +301,7 @@ export class TetrisGame {
       };
     }
     this.holdUsed = true;
+    this.socketManager.emitState(this.getState());
   }
 
   public setDropTime(time: number | null) {
@@ -266,6 +334,7 @@ export class TetrisGame {
           this.gameOver = true;
           this.dropTime = null;
           this.soundManager.playGameOver();
+          this.socketManager.emitState(this.getState());
       }
   }
 
@@ -316,9 +385,11 @@ export class TetrisGame {
             this.won = true;
             this.gameOver = true;
             this.dropTime = null;
-            // Optionally play win sound
+            this.socketManager.emitWin(); // I won!
         }
       }
+
+      this.socketManager.emitState(this.getState());
 
       // 4. Spawn Next
       if (!this.gameOver) {
@@ -360,11 +431,6 @@ export class TetrisGame {
                      const targetX = x + this.player.pos.x;
                      if (renderStage[targetY] && renderStage[targetY][targetX]) {
                          renderStage[targetY][targetX] = [value, 'clear']; // Or just value?
-                         // In original 'useStage', it was: [value, `${player.collided ? 'merged' : 'clear'}`]
-                         // Here, we know it's active (not collided/merged yet because updateStage handles merge).
-                         // So it is 'clear' status but with color.
-                         // Wait, if I set 'clear', it might be swept? No, this is renderStage.
-                         // The cell status is usually 'clear', 'merged', 'ghost'.
                          renderStage[targetY][targetX] = [value, 'clear'];
                      }
                 }
@@ -381,7 +447,10 @@ export class TetrisGame {
         dropTime: this.dropTime,
         nextPiece: this.nextPiece,
         hold: this.hold,
-        won: this.won
+        won: this.won,
+        opponent: this.opponentState,
+        waiting: this.waiting,
+        room: this.room
     };
   }
 }

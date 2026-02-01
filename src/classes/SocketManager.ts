@@ -1,8 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import { GameState } from './TetrisGame';
 
-// Determine URL based on environment or default to localhost
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+// Determine URL: Use env var if set, otherwise use relative path in Prod (same origin), or localhost in Dev.
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || (import.meta.env.PROD ? '/' : 'http://localhost:3001');
 
 export class SocketManager {
   private socket: Socket;

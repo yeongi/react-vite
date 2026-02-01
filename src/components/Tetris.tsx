@@ -6,7 +6,7 @@ import { useTetrisGame } from '../hooks/useTetrisGame';
 // Components
 import Stage from './Stage';
 import Display from './Display';
-import StartButton from './StartButton';
+// import StartButton from './StartButton';
 import HoldPiece from './HoldPiece';
 import NextPiece from './NextPiece';
 

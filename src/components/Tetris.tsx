@@ -1,12 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-
-import { createStage, checkCollision } from '../gameHelpers';
+import React, { useEffect, useRef } from 'react';
 
 // Hooks
-import { useInterval } from '../hooks/useInterval';
-import { usePlayer } from '../hooks/usePlayer';
-import { useStage } from '../hooks/useStage';
-import { useGameStatus } from '../hooks/useGameStatus';
+import { useTetrisGame } from '../hooks/useTetrisGame';
 
 // Components
 import Stage from './Stage';
@@ -16,60 +11,21 @@ import HoldPiece from './HoldPiece';
 import NextPiece from './NextPiece';
 
 const Tetris: React.FC = () => {
-  const [dropTime, setDropTime] = useState<number | null>(null);
-  const [gameOver, setGameOver] = useState(false);
-
-  const { player, updatePlayerPos, resetPlayer, playerRotate, activateHold, hold, playerHardDrop, nextPiece } = usePlayer();
-  const { stage, setStage, rowsCleared } = useStage(player, resetPlayer);
-  const { score, rows, level, setLevel, resetGameStatus } = useGameStatus(rowsCleared);
+  const { gameState, actions } = useTetrisGame();
+  const { stage, score, rows, level, gameOver, hold, nextPiece } = gameState;
   
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const movePlayer = (dir: number) => {
-    if (!checkCollision(player, stage, { x: dir, y: 0 })) {
-      updatePlayerPos({ x: dir, y: 0, collided: false });
-    }
-  };
-
-  const startGame = useCallback(() => {
-    // Reset everything
-    setStage(createStage());
-    setDropTime(1000);
-    resetPlayer();
-    setGameOver(false);
-    resetGameStatus();
-    wrapperRef.current?.focus();
-  }, [resetPlayer, resetGameStatus, setStage]);
-
   useEffect(() => {
-    startGame();
+    actions.startGame();
+    wrapperRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const drop = () => {
-    // Increase level when player has cleared 10 rows
-    if (rows > (level + 1) * 10) {
-      setLevel(prev => prev + 1);
-      // Also increase speed
-      setDropTime(1000 / (level + 1) + 200);
-    }
-
-    if (!checkCollision(player, stage, { x: 0, y: 1 })) {
-      updatePlayerPos({ x: 0, y: 1, collided: false });
-    } else {
-      // Game Over
-      if (player.pos.y < 1) {
-        setGameOver(true);
-        setDropTime(null);
-      }
-      updatePlayerPos({ x: 0, y: 0, collided: true });
-    }
-  };
 
   const keyUp = ({ keyCode }: { keyCode: number }) => {
     if (!gameOver) {
       if (keyCode === 40) {
-        setDropTime(1000 / (level + 1) + 200);
+        actions.setDropTime(1000 / (level + 1) + 200);
       }
     }
   };
@@ -78,32 +34,28 @@ const Tetris: React.FC = () => {
     if (!gameOver) {
       if (e.keyCode === 37) {
         e.preventDefault();
-        movePlayer(-1);
+        actions.move(-1);
       } else if (e.keyCode === 39) {
         e.preventDefault();
-        movePlayer(1);
+        actions.move(1);
       } else if (e.keyCode === 40) {
         e.preventDefault();
-        setDropTime(30);
+        actions.setDropTime(30);
       } else if (e.keyCode === 38) {
         e.preventDefault();
-        playerRotate(stage, 1);
+        actions.rotate(1);
       } else if (e.keyCode === 67) { // C key
         e.preventDefault();
-        activateHold();
+        actions.holdPiece();
       } else if (e.keyCode === 90) { // Z key
         e.preventDefault();
-        playerRotate(stage, -1);
+        actions.rotate(-1);
       } else if (e.keyCode === 32) { // Space key
         e.preventDefault();
-        playerHardDrop(stage);
+        actions.hardDrop();
       }
     }
   };
-
-  useInterval(() => {
-    drop();
-  }, dropTime);
 
   return (
     <div className='tetris-wrapper' role="button" tabIndex={0} onKeyDown={move} onKeyUp={keyUp} ref={wrapperRef}>
@@ -123,7 +75,7 @@ const Tetris: React.FC = () => {
               <HoldPiece hold={hold} />
             </div>
           )}
-          <StartButton callback={startGame} />
+          <StartButton callback={actions.startGame} />
         </aside>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { STAGE, IPlayer, TETROMINO_TYPE, TETROMINOS, STAGE_WIDTH, createStage, checkCollision, generateBag } from '../gameHelpers';
+import { SoundManager } from './SoundManager';
 
 // SRS Wall Kick Data
 const SRS_KICKS_JLS_T_Z = {
@@ -42,6 +43,7 @@ export class TetrisGame {
   private hold: TETROMINO_TYPE | null;
   private holdUsed: boolean;
   private floorSpinCount: number;
+  private soundManager: SoundManager;
   
   // Game Status
   private score: number;
@@ -62,6 +64,7 @@ export class TetrisGame {
     this.level = 0;
     this.gameOver = false;
     this.dropTime = null;
+    this.soundManager = new SoundManager();
 
     // Initialize Bag and Player
     this.nextPiece = this.popFromBag(); // Provisional
@@ -93,6 +96,7 @@ export class TetrisGame {
   // --- Core Game Logic ---
 
   public start() {
+    this.soundManager.resume();
     this.stage = createStage();
     this.bag = [];
     this.hold = null;
@@ -117,6 +121,7 @@ export class TetrisGame {
   }
 
   public move(dir: number) {
+    this.soundManager.resume();
     if (this.gameOver) return;
     if (!checkCollision(this.player, this.stage, { x: dir, y: 0 })) {
       this.player.pos.x += dir;
@@ -140,6 +145,7 @@ export class TetrisGame {
       if (this.player.pos.y < 1) {
         this.gameOver = true;
         this.dropTime = null;
+        this.soundManager.playGameOver();
       }
       // Lock piece
       this.player.collided = true;
@@ -148,6 +154,7 @@ export class TetrisGame {
   }
 
   public hardDrop() {
+    this.soundManager.resume();
     if (this.gameOver) return;
     let tmpY = 0;
     while (!checkCollision(this.player, this.stage, { x: 0, y: tmpY + 1 })) {
@@ -159,6 +166,7 @@ export class TetrisGame {
   }
 
   public rotate(dir: number) {
+    this.soundManager.resume();
     if (this.gameOver) return;
 
     // Floor spin limit
@@ -199,6 +207,7 @@ export class TetrisGame {
   }
 
   public holdPiece() {
+    this.soundManager.resume();
     if (this.gameOver || this.holdUsed) return;
 
     const currentType = this.player.tetromino.flat().find(cell => cell !== 0) as TETROMINO_TYPE | undefined;
@@ -243,6 +252,7 @@ export class TetrisGame {
       if (checkCollision(this.player, this.stage, { x: 0, y: 0 })) {
           this.gameOver = true;
           this.dropTime = null;
+          this.soundManager.playGameOver();
       }
   }
 
@@ -265,6 +275,7 @@ export class TetrisGame {
       });
 
       this.stage = newStage;
+      this.soundManager.playDrop();
 
       // 2. Sweep Rows
       let rowsCleared = 0;
@@ -278,8 +289,9 @@ export class TetrisGame {
         return ack;
       }, [] as STAGE);
 
-      // 3. Update Score
+      // 3. Update Score and Play Sound
       if (rowsCleared > 0) {
+        this.soundManager.playClear(rowsCleared);
         const linePoints = [40, 100, 300, 1200];
         const points = linePoints[rowsCleared - 1] || 0; // Safeguard
         this.score += points * (this.level + 1);
